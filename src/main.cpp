@@ -25,7 +25,6 @@ uint8_t Led_BT_count = 0;
 Plantlist Pflanzenliste;
 //---------------------------------------------------------------------
 
-//setup
 void setup() {
   
   //Serial start
