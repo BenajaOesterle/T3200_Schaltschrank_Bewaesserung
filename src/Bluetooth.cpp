@@ -6,47 +6,33 @@
 #include "GlobalHeader.h"
 
 TaskHandle_t Task1;
-BluetoothSerial SerialBT;
+BluetoothSerial SerialBT;                                                     
 StaticJsonDocument<2048> tmp_JSON_Data; 
 
-bool NEW_Bluetoothdata = false;
+
 
 #if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
 #error Bluetooth is not enabled! Please run 'make menuconfig' to and enable it
 #endif
 
-void BluetoothLED(uint8_t * Led_BT_count)
-{
-    if(*Led_BT_count>0)
-    {
-      digitalWrite(LED_BT_Recieve,HIGH);
-      *Led_BT_count--;
-    }
-    else
-    {
-      digitalWrite(LED_BT_Recieve,LOW);
-    }
-
-}
-
 
 void codeForTask1(void * parameter)
 {
   //Einmalige Ausführung vergleichbar zum "void Setup()" auf Core 0
-  SerialBT.begin("ESP32_Bewaesserung");
+  SerialBT.begin("ESP32_Bewaesserung");                                           
   Serial.println("Bluetooth is started now you can pair your Device");  
 
   //Endlosschleife für den Empfang von Bluetoothdaten
   for(;;)
   {
     //Wenn Bluetoothdaten verfügbar sind, versuche diese auszuwerten
-    if(SerialBT.available())
+    if(SerialBT.available())                                                      
     {
       //Bluetoothdaten als JSON-Datei interpretieren. Falls nicht möglich setzte error
-      DeserializationError error = deserializeJson(JSON_CONVERTER::JSON_Data, SerialBT);
+      DeserializationError error = deserializeJson(JSON_CONVERTER::JSON_Data_BT, SerialBT);
 
       //Wenn die Daten neu sind und noch nicht ausgewert, setzte "NEW_Bluetoothdata"
-      if(!(tmp_JSON_Data == JSON_CONVERTER::JSON_Data))
+      if(!(tmp_JSON_Data == JSON_CONVERTER::JSON_Data_BT))
       {
         if (error) {
           Serial.print("deserializeJson() failed: ");
@@ -54,22 +40,24 @@ void codeForTask1(void * parameter)
         }
         else{
           Serial.print("deserializeJson() successed: ");
-          NEW_Bluetoothdata = true;
+          JSON_CONVERTER::NEW_Bluetoothdata = true;
 
           //Gebe die empfangenen Daten auf dem Serial Monitor aus
-          serializeJsonPretty(JSON_CONVERTER::JSON_Data, Serial);
+          serializeJsonPretty(JSON_CONVERTER::JSON_Data_BT, Serial);
+          Serial.println();
+          serializeJson(JSON_CONVERTER::JSON_Data_BT, Serial);
         }
         //Empfangsbestätigung für den Sender
-        SerialBT.println("Ready to send next");
+        SerialBT.println("Ready to send next");                 
       }
     }
-    //Pausiere den Task für 40 Ticks um Hintergrundtasks Zeit zur ausführung zu geben
-    vTaskDelay(40);
+    //Pausiere den Task für 60 Ticks um Hintergrundtasks Zeit zur ausführung zu geben
+    vTaskDelay(60);
   }
 }
 
 
-void Tasksetup()
+void Tasksetup1()
 {
   xTaskCreatePinnedToCore
   (

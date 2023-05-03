@@ -8,6 +8,9 @@
 #include <BluetoothSerial.h>  //Für die Bluetooth Kommunikation
 #include <string.h>           //Für String-Operationen
 #include <Preferences.h>      //Für Speicher-/Auslesevorgänge des Flash-EEPROM-Speichers
+// Include Libraries
+#include <WiFi.h>
+#include <esp_now.h>
 
 //--------------------------------------------------------------------
 // MAIN VARIABLEN LISTE:
@@ -21,8 +24,11 @@ DateTime CurrentTime;
 //Counter für die Leuchtdauer der BT-LED
 uint8_t Led_BT_count = 0;
 
+uint8_t On_Count = 0; 
+
 //Enthält alle Daten der Pflanzen
 Plantlist Pflanzenliste;
+
 //---------------------------------------------------------------------
 
 void setup() {
@@ -35,7 +41,7 @@ void setup() {
   Outputsetup();
 
   //Task mit Bluetoothfunktion wird initialisiert 
-  Tasksetup();
+  Tasksetup1();
 
   //Real Time Clock wird initialisiert
   RTCSetup(&rtc);
@@ -48,10 +54,13 @@ void setup() {
 
   //EEPROM 
   PLANT_EEPROM::Setup_and_Load(&Pflanzenliste);
+
+  JSON_CONVERTER::MAC_from_this_Device = Initial_ESP_NOW();
 }
 
 
  
+
 void loop(){
 
   //Durchführung der Schleife = 1x pro Millisekunde
@@ -59,8 +68,9 @@ void loop(){
   {
     milli_flag = false;
 
-    Pump::Activation(CurrentTime,&Pflanzenliste);
-    Pflanzenliste.MilliSec_Loop();
+    Pflanzenliste.periodic_function(CurrentTime);
+    //Pflanzenliste.MilliSec_Loop();
+    Kalibration_Mode::Kalibration_Loop(&Pflanzenliste,CurrentTime);  
   }
 
 
@@ -71,21 +81,37 @@ void loop(){
     
     CurrentTime = rtc.now();
 
-    if(NEW_Bluetoothdata)
+    if(JSON_CONVERTER::NEW_Bluetoothdata)
     {
-      JSON_CONVERTER::Convert_JSON_TO_DATA(&Pflanzenliste, &rtc);
-      NEW_Bluetoothdata = false;
+      Serial.println("New BT-Data--------------------------");
+      JSON_CONVERTER::Convert_JSON_TO_DATA_BT(&Pflanzenliste, &rtc, CurrentTime);
+      JSON_CONVERTER::NEW_Bluetoothdata = false;
       Led_BT_count = BT_LED_SECONDS;
+    }
+    if(JSON_CONVERTER::NEW_ESPNOW_Data)
+    {
+      Serial.println("New ESPNOW-Data--------------------------");
+      JSON_CONVERTER::Convert_JSON_TO_DATA_ESPNOW(&Pflanzenliste, CurrentTime);
+      JSON_CONVERTER::NEW_ESPNOW_Data = false;
     }
 
     BluetoothLED(&Led_BT_count);
 
+    if(On_Count<MASTER_CALL_BC_TIME)
+    {
+      On_Count++;
+      JSON_CONVERTER::RangeTest_STATUS = true;
+      //broadcast(JSON_CONVERTER::MAC_to_JSON_String());
+    }
     //Serial Monitor Kontrolle
-    Pflanzenliste.Serialprint_all_Elements();
-    Pump::ControlTask();    
+    Pflanzenliste.Serialprint_all_Elements(CurrentTime);
+    Pump::ControlTask();
+    if(Kalibration_Mode::Active != 0)
+    {
+      Serial.printf("KalibrationMode Active = %d\n", Kalibration_Mode::Active);
+    }    
     
-    //Full Timestamp
-    Serial.println(String("DateTime::TIMESTAMP_FULL:\t")+CurrentTime.timestamp(DateTime::TIMESTAMP_FULL)+"\n");
+    ESP_NOW_Broadcast_cycle();
   }
   
 }

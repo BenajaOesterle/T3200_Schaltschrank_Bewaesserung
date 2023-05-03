@@ -9,6 +9,8 @@
 #include <string.h>
 #include <string>
 #include <ArduinoJson.h>
+#include <WiFi.h>
+#include <esp_now.h>
 
 //#include "Plant.h"
 
@@ -24,6 +26,8 @@
 #define VALVE4 19
 
 #define BT_LED_SECONDS 5
+#define MASTER_CALL_BC_TIME 10
+#define RANGE_SENDS 500 //alle 500ms senden
 
 //Variables-ENDE------------------------------------------------------------
 
@@ -35,9 +39,8 @@ void RTCSetup(RTC_DS1307 *rtc_fnc);
 
 
 //Bluetooth.cpp-------------------------------------------------------------
-void Tasksetup();
+void Tasksetup1();
 void BluetoothLED(uint8_t * Led_BT_count);
-extern bool NEW_Bluetoothdata;
 //Bluetooth-ENDE------------------------------------------------------------
 
 
@@ -51,5 +54,10 @@ bool OneSecEdge();
 bool OneMilliSecEdge();
 bool OneSecCounter();
 //Timer_fnc.cpp-ENDE--------------------------------------------------------
+
+//Broadcast-----------------------------------------------------------------
+void broadcast(const String &message);
+String Initial_ESP_NOW();
+void ESP_NOW_Broadcast_cycle();
 
 #endif

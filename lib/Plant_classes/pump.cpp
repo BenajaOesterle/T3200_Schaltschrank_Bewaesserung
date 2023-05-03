@@ -9,6 +9,11 @@ uint8_t     Pump::Valve1_Port = 0;
 uint8_t     Pump::Valve2_Port = 0;
 uint8_t     Pump::Valve3_Port = 0;
 
+uint8_t     Pump::LED_Number_Blinks = 0;   //Wie oft soll die LED Blinken
+uint8_t     Pump::LED_Blinktime = 0;
+bool        Pump::LED_Pump_Condition = false;     
+bool        Pump::LED_deactivated_by_Pump = true;
+
 bool        Pump::M_Control_active = false;
 DateTime    Pump::CurrentTime;
 DateTime    Pump::Prev_Sec;
@@ -24,6 +29,8 @@ uint8_t     Pump::Valve1_Condition = 0;
 uint8_t     Pump::Valve2_Condition = 0;
 uint8_t     Pump::Valve3_Condition = 0;
 uint8_t     Pump::Waterspeed_out = 0;
+
+uint8_t     Pump::Printcounter = 0;
 
 void Pump::Setup(uint8_t Output_Port, uint8_t LED_Pump, uint8_t Valve1_Port, uint8_t Valve2_Port, uint8_t Valve3_Port){
 
@@ -65,9 +72,27 @@ void Pump::OutputControl(){
     analogWrite(Output_Port, Waterspeed_out);
 
     if(Waterspeed_out>0)
+    {
+        LED_Pump_Condition = true;
+        LED_deactivated_by_Pump = false;
+    }
+    else if(LED_Pump_Condition == true && LED_deactivated_by_Pump == false)
+    {
+       LED_Pump_Condition = false;
+       LED_deactivated_by_Pump = true;
+    }
+
+    if(Pump_availaible == true)
+    {
+      LED_Blink();  
+    }
+    
+
+    if(LED_Pump_Condition)
         digitalWrite(LED_Pump,LOW);
     else
-        digitalWrite(LED_Pump,HIGH);
+        digitalWrite(LED_Pump,HIGH); 
+        
 }
 
 
@@ -76,6 +101,9 @@ void Pump::Start_Water_Process(uint8_t Waterspeed, uint32_t Wateringtime_ms, uin
     Pump::Waterspeed = Waterspeed;
     Pump::Pump_availaible = false;
     Pump::Start_Time = CurrentTime;
+
+    Serial.println("Waterprocess start ----------------------------------------");
+    Serial.println(Wateringtime_ms);
 
     if(Valve==0){Valve1_Condition=0;Valve2_Condition=0;Valve3_Condition=0;}
     if(Valve==1){Valve1_Condition=1;Valve2_Condition=0;Valve3_Condition=0;}
@@ -134,47 +162,33 @@ void Pump::Ramp(){
     }
 }
 
-void Pump::Activation(DateTime CurrentTime_input, Plantlist *Pflanzenliste){
-
-    Pump::CurrentTime = CurrentTime_input;
-
-    if(Pump::Pump_availaible==false)
-    {Pump::Ramp();}
-
-    OutputControl(); 
-
-
-    if(CurrentTime.hour() == 0
-    && CurrentTime.minute() == 0
-    && CurrentTime.second() == 0)
-    {
-        for(int i = 0; i<=Pflanzenliste->Plant_counter; i++)
-        {
-            Pflanzenliste->Plantlist_ARRAY[i].Watered_Today = false;
-        }
-    }
-    else{
-        for(int i = 0; i<=Pflanzenliste->Plant_counter; i++)
-        {
-            DateTime Plant_Water_Time = {CurrentTime.year(), CurrentTime.month(), CurrentTime.day(), Pflanzenliste->Plantlist_ARRAY[i].W_Hour,Pflanzenliste->Plantlist_ARRAY[i].W_Minute,1};
-            
-            if(Plant_Water_Time.secondstime()<=CurrentTime.secondstime()
-            && Plant_Water_Time.secondstime()>=(CurrentTime.secondstime()-60)
-            && Pflanzenliste->Plantlist_ARRAY[i].Watered_Today == false)
-            {
-                Pflanzenliste->Plantlist_ARRAY[i].NeedsToBeWatered = true;
-                Pflanzenliste->Plantlist_ARRAY[i].Watered_Today = true;
-            }
-
-        }
-
-    }
-
-}
 
 void Pump::ControlTask(){
+    if(Printcounter<PRINTINTERVALL)
+    {
+        Printcounter++;
+    }
+    else
+    {
+          
+        Serial.printf("Valve1       = %d            Valve2          = %d            Valve3          = %d\n", Valve1_Condition, Valve2_Condition, Valve3_Condition);
+        Serial.printf("Pumpe_Out    = %d           Starttime       = %d   Wateringtime    = %d\n", Waterspeed_out, Start_Time.secondstime(), Wateringtime_ms);
+        Serial.printf("Current Time = %d  Differenztime   = %d  M_Control activ = %d\n\n",CurrentTime.secondstime(), ((Start_Time.secondstime()*1000) + Wateringtime_ms) - (CurrentTime.secondstime()*1000),M_Control_active);
+        Serial.printf("LED Status = %d LED Bink Num = %d LED Timer = %d\n",LED_Pump_Condition, LED_Number_Blinks, LED_Blinktime);
+        //Full Timestamp
+        Serial.println(String("DateTime::TIMESTAMP_FULL:\t")+CurrentTime.timestamp(DateTime::TIMESTAMP_FULL)+"\n");
+        
+        Printcounter = 0;
+    }
+}
 
-    Serial.printf("Valve1       = %d            Valve2          = %d            Valve3          = %d\n", Valve1_Condition, Valve2_Condition, Valve3_Condition);
-    Serial.printf("Pumpe_Out    = %d           Starttime       = %d   Wateringtime    = %d\n", Waterspeed_out, Start_Time.secondstime(), Wateringtime_ms);
-    Serial.printf("Current Time = %d  Differenztime   = %d  M_Control activ = %d\n\n",CurrentTime.secondstime(), ((Start_Time.secondstime()*1000) + Wateringtime_ms) - (CurrentTime.secondstime()*1000),M_Control_active);
+void Pump::LED_Blink(){
+    if(LED_Number_Blinks>0 && LED_Blinktime<BLINKSPEED_LED)
+        LED_Blinktime++;
+    else if(LED_Number_Blinks>0)
+    {
+        LED_Blinktime = 0;
+        LED_Number_Blinks--;
+        LED_Pump_Condition = !(LED_Pump_Condition);
+    }
 }

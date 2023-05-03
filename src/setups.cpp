@@ -52,3 +52,17 @@ void RTCSetup(RTC_DS1307 *rtc_fnc)
   //*rtc_fnc = rtc_tmp;
 }
 
+void BluetoothLED(uint8_t *Led_BT_count)
+{
+  uint8_t x = *Led_BT_count;
+  if(x>0)
+  {
+    x--;
+    digitalWrite(LED_BT_Recieve,HIGH);
+  }
+  else
+  {
+    digitalWrite(LED_BT_Recieve,LOW);
+  }
+  *Led_BT_count = x;
+}
